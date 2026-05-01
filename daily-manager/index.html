@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="오늘의 할 일">
+<link rel="apple-touch-icon" href="icon.png">
+<title>오늘의 할 일</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --accent: #2563eb;
+  --text-primary: #1a1a18;
+  --text-secondary: #4a4a45;
+  --text-muted: #9a9a92;
+  --surface: #ffffff;
+  --surface-alt: #f6f6f3;
+  --border: #e2e2dc;
+  --border-light: #eeeeea;
+  --bg: #fafaf8;
+}
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-user-select: none; user-select: none;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+input { -webkit-user-select: text; user-select: text; }
+input::placeholder { color: var(--text-muted); opacity: 0.5; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.header-inner { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; max-width: 1080px; margin: 0 auto; }
+.header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; }
+.header .date { margin-top: 4px; font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.btn-reset { background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+.progress-wrap { display: flex; gap: 20px; margin-top: 14px; max-width: 1080px; margin-left: auto; margin-right: auto; }
+.progress-bar { flex: 1; min-width: 80px; }
+.progress-bar .info { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; font-weight: 600; }
+.progress-bar .label { color: var(--text-muted); }
+.progress-bar .count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.progress-bar .track { height: 6px; border-radius: 3px; background: var(--border-light); overflow: hidden; }
+.progress-bar .fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), #60a5fa); transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
+.progress-bar .fill.done { background: linear-gradient(90deg, #16a34a, #22c55e); }
+
+.content { padding: 20px 24px; display: flex; gap: 24px; flex-wrap: wrap; max-width: 1080px; margin: 0 auto; }
+
+.todo-section { flex: 1 1 320px; min-width: 0; }
+.schedule-section { flex: 1.2 1 380px; min-width: 0; }
+.section-title { margin-bottom: 12px; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+
+.todo-input-row { display: flex; gap: 6px; margin-bottom: 12px; }
+.todo-input-row input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; font-family: inherit; color: var(--text-primary); outline: none; }
+.todo-input-row input:focus { border-color: var(--accent); }
+.btn-add { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+
+.todo-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; transition: all 0.2s ease; }
+.todo-item.done { background: var(--surface-alt); opacity: 0.55; }
+.todo-item .text { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.todo-item.done .text { text-decoration: line-through; }
+.btn-remove { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 2px 4px; border-radius: 4px; line-height: 1; opacity: 0.4; }
+
+.status-badge { border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; line-height: 1.5; border-width: 1px; border-style: solid; position: relative; }
+.status-dropdown { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border-radius: 8px; z-index: 100; padding: 4px; min-width: 100px; box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05); }
+.status-dropdown button { display: block; width: 100%; text-align: left; border: none; border-radius: 5px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; background: transparent; }
+.overlay { position: fixed; inset: 0; z-index: 99; }
+
+.schedule-table { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+.schedule-header { display: grid; grid-template-columns: 60px 1fr; background: var(--surface-alt); border-bottom: 1px solid var(--border); }
+.schedule-header div { padding: 7px 8px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-align: center; border-right: 1px solid var(--border-light); letter-spacing: 0.03em; }
+.schedule-header div:last-child { border-right: none; }
+.schedule-row { display: grid; grid-template-columns: 60px 1fr; border-bottom: 1px solid var(--border-light); transition: all 0.3s; }
+.schedule-row:last-child { border-bottom: none; }
+.schedule-row.past { background: var(--surface-alt); }
+.schedule-row.past .time-cell { color: var(--border) !important; font-weight: 400 !important; }
+.schedule-row.past .schedule-input { color: var(--border); }
+.schedule-cell { border-right: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; }
+.schedule-cell:last-child { border-right: none; }
+.time-cell { font-size: 13px; font-weight: 500; color: var(--text-secondary); font-variant-numeric: tabular-nums; gap: 3px; }
+.time-cell.now { font-weight: 700; color: var(--accent); }
+.pulse-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; animation: pulse 2s ease-in-out infinite; }
+.schedule-input { width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 13px; font-family: inherit; color: var(--text-primary); outline: none; }
+
+.memo-wrap { padding: 0 24px 24px; max-width: 1080px; margin: 0 auto; }
+.memo-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.memo-box label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.03em; }
+.memo-box input { width: 100%; border: none; background: transparent; font-size: 14px; font-family: inherit; color: var(--text-primary); outline: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div>
+      <h1>오늘의 할 일</h1>
+      <div class="date" id="today-date"></div>
+    </div>
+    <button class="btn-reset" id="btn-reset">초기화</button>
+  </div>
+  <div class="progress-wrap" style="margin-top:14px">
+    <div class="progress-bar">
+      <div class="info"><span class="label">할 일</span><span class="count" id="todo-count">0/0</span></div>
+      <div class="track"><div class="fill" id="todo-fill" style="width:0%"></div></div>
+    </div>
+    <div class="progress-bar">
+      <div class="info"><span class="label">시간표</span><span class="count" id="sched-count">0/0</span></div>
+      <div class="track"><div class="fill" id="sched-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+  <div class="todo-section">
+    <div class="section-title">📝 할 일 목록</div>
+    <div class="todo-input-row">
+      <input type="text" id="todo-input" placeholder="할 일 추가...">
+      <button class="btn-add" id="btn-add">추가</button>
+    </div>
+    <div id="todo-list"></div>
+  </div>
+  <div class="schedule-section">
+    <div class="section-title">⏰ 하루 관리표</div>
+    <div class="schedule-table">
+      <div class="schedule-header"><div>시간</div><div>해야 할 일</div></div>
+      <div id="schedule-body"></div>
+    </div>
+  </div>
+</div>
+
+<div class="memo-wrap">
+  <div class="memo-box">
+    <label>💬 오늘의 한 줄</label>
+    <input type="text" id="memo-input" placeholder="오늘 하루를 한 줄로 기록해보세요">
+  </div>
+</div>
+
+<script>
+const STATUS = { BEFORE:'진행전', DOING:'진행중', DONE:'진행완료', HOLD:'진행보류' };
+const STATUS_ORDER = [STATUS.BEFORE, STATUS.DOING, STATUS.HOLD, STATUS.DONE];
+const STATUS_COLORS = {
+  [STATUS.BEFORE]: { bg:'#f0f0ec', text:'#8a8a82', border:'#d8d8d0' },
+  [STATUS.DOING]: { bg:'#dbeafe', text:'#2563eb', border:'#93bbfd' },
+  [STATUS.DONE]: { bg:'#dcfce7', text:'#16a34a', border:'#86efac' },
+  [STATUS.HOLD]: { bg:'#f3f4f6', text:'#6b7280', border:'#d1d5db' },
+};
+const HOURS = Array.from({length:18},(_,i)=>`${(i+6).toString().padStart(2,'0')}:00`);
+const DEFAULT_TODOS = ['침실 정리 & 물 마시기','매달리기','샤워','환기','손풀기'];
+
+function todayKey() {
+  const d = new Date();
+  if (d.getHours() < 5) d.setDate(d.getDate() - 1);
+  return `dm-${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+}
+
+function saveState() {
+  try {
+    const data = { todos, schedule, memo: document.getElementById('memo-input').value, nextId };
+    localStorage.setItem(todayKey(), JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(todayKey());
+    if (raw) {
+      const data = JSON.parse(raw);
+      todos = data.todos || [];
+      schedule = data.schedule || HOURS.map(h=>({hour:h, task:''}));
+      nextId = data.nextId || 100;
+      setTimeout(()=>{ document.getElementById('memo-input').value = data.memo || ''; }, 0);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+function resetAll() {
+  todos = DEFAULT_TODOS.map((t,i)=>({id:++nextId+i, text:t, status:STATUS.BEFORE}));
+  schedule = HOURS.map(h=>({hour:h, task:''}));
+  document.getElementById('memo-input').value = '';
+  renderTodos();
+  renderSchedule();
+  saveState();
+}
+
+let currentDayKey;
+let todos, schedule, nextId;
+currentDayKey = todayKey();
+if (!loadState()) {
+  todos = DEFAULT_TODOS.map((t,i)=>({id:i+1, text:t, status:STATUS.BEFORE}));
+  schedule = HOURS.map(h=>({hour:h, task:''}));
+  nextId = 100;
+}
+
+setInterval(()=>{
+  const newKey = todayKey();
+  if (newKey !== currentDayKey) {
+    currentDayKey = newKey;
+    nextId = 100;
+    resetAll();
+    document.getElementById('today-date').textContent = getToday();
+  }
+}, 30000);
+
+function getToday() {
+  const d = new Date(), days = ['일','월','화','수','목','금','토'];
+  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} (${days[d.getDay()]})`;
+}
+
+function getCurrentHour() {
+  return `${new Date().getHours().toString().padStart(2,'0')}:00`;
+}
+
+function updateProgress() {
+  const todoDone = todos.filter(t=>t.status===STATUS.DONE).length;
+  const todoTotal = todos.length;
+  const todoPct = todoTotal ? Math.round(todoDone/todoTotal*100) : 0;
+  document.getElementById('todo-count').textContent = `${todoDone}/${todoTotal}`;
+  const todoFill = document.getElementById('todo-fill');
+  todoFill.style.width = todoPct+'%';
+  todoFill.className = 'fill' + (todoPct===100&&todoTotal>0?' done':'');
+  document.getElementById('todo-count').style.color = todoPct===100&&todoTotal>0?'#16a34a':'';
+
+  const nowHour = new Date().getHours();
+  const pastWithTask = schedule.filter(s=> parseInt(s.hour) < nowHour && s.task.trim()).length;
+  const totalWithTask = schedule.filter(s=>s.task.trim()).length;
+  const schedPct = HOURS.length ? Math.round((pastWithTask + schedule.filter(s=>parseInt(s.hour)>=nowHour && s.task.trim()).length) / HOURS.length * 100) : 0;
+  document.getElementById('sched-count').textContent = `${totalWithTask}/${HOURS.length}`;
+  const schedFill = document.getElementById('sched-fill');
+  schedFill.style.width = schedPct+'%';
+  schedFill.className = 'fill' + (schedPct===100?' done':'');
+  document.getElementById('sched-count').style.color = schedPct===100?'#16a34a':'';
+}
+
+function renderTodos() {
+  const sorted = [...todos].sort((a,b)=>STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status));
+  const container = document.getElementById('todo-list');
+  container.innerHTML = '';
+  if(!sorted.length) {
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">할 일을 추가해보세요</div>';
+    updateProgress(); return;
+  }
+  sorted.forEach(todo => {
+    const isDone = todo.status === STATUS.DONE;
+    const c = STATUS_COLORS[todo.status];
+    const div = document.createElement('div');
+    div.className = 'todo-item' + (isDone?' done':'');
+    div.innerHTML = `
+      <div style="position:relative">
+        <button class="status-badge" data-id="${todo.id}" style="background:${c.bg};color:${c.text};border-color:${c.border}">${todo.status}</button>
+      </div>
+      <span class="text">${todo.text}</span>
+      <button class="btn-remove" data-id="${todo.id}">✕</button>
+    `;
+    container.appendChild(div);
+  });
+  container.querySelectorAll('.status-badge').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      closeDropdowns();
+      const id = +btn.dataset.id;
+      const todo = todos.find(t=>t.id===id);
+      const dd = document.createElement('div');
+      dd.className = 'status-dropdown';
+      STATUS_ORDER.forEach(s => {
+        const b = document.createElement('button');
+        b.textContent = s;
+        b.style.color = STATUS_COLORS[s].text;
+        if(todo.status===s) b.style.background = STATUS_COLORS[s].bg;
+        b.addEventListener('click', ()=>{
+          todo.status = s;
+          closeDropdowns();
+          renderTodos();
+        });
+        dd.appendChild(b);
+      });
+      btn.parentElement.appendChild(dd);
+      const overlay = document.createElement('div');
+      overlay.className = 'overlay';
+      overlay.addEventListener('click', closeDropdowns);
+      document.body.appendChild(overlay);
+    });
+  });
+  container.querySelectorAll('.btn-remove').forEach(btn => {
+    btn.addEventListener('click', ()=>{
+      todos = todos.filter(t=>t.id!==+btn.dataset.id);
+      renderTodos();
+    });
+  });
+  updateProgress();
+  saveState();
+}
+
+function closeDropdowns() {
+  document.querySelectorAll('.status-dropdown').forEach(d=>d.remove());
+  document.querySelectorAll('.overlay').forEach(o=>o.remove());
+}
+
+function renderSchedule() {
+  const nowHour = new Date().getHours();
+  const container = document.getElementById('schedule-body');
+  container.innerHTML = '';
+  schedule.forEach((item,i) => {
+    const hourNum = parseInt(item.hour);
+    const isPast = hourNum < nowHour;
+    const isCurrent = hourNum === nowHour;
+    const row = document.createElement('div');
+    row.className = 'schedule-row' + (isPast?' past':'');
+    const bg = isCurrent ? 'rgba(37,99,235,0.04)' : 'var(--surface)';
+    row.innerHTML = `
+      <div class="schedule-cell time-cell ${isCurrent?'now':''}" style="background:${bg}">
+        ${isCurrent?'<span class="pulse-dot"></span>':''}${item.hour}
+      </div>
+      <div class="schedule-cell" style="background:${bg};padding:0;border-right:none">
+        <input class="schedule-input" value="${item.task}" placeholder="—" data-hour="${item.hour}">
+      </div>
+    `;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('.schedule-input').forEach(inp => {
+    inp.addEventListener('input', ()=>{
+      const s = schedule.find(x=>x.hour===inp.dataset.hour);
+      s.task = inp.value;
+      updateProgress();
+      saveState();
+    });
+  });
+  updateProgress();
+}
+
+document.getElementById('today-date').textContent = getToday();
+
+document.getElementById('btn-add').addEventListener('click', ()=>{
+  const inp = document.getElementById('todo-input');
+  const text = inp.value.trim();
+  if(!text) return;
+  todos.push({id:++nextId, text, status:STATUS.BEFORE});
+  inp.value = '';
+  renderTodos();
+});
+document.getElementById('todo-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') document.getElementById('btn-add').click();
+});
+
+document.getElementById('btn-reset').addEventListener('click', ()=>{
+  if(confirm('오늘 기록을 모두 초기화할까요?')) {
+    resetAll();
+  }
+});
+
+document.getElementById('memo-input').addEventListener('input', ()=>{ saveState(); });
+
+renderTodos();
+renderSchedule();
+
+setInterval(()=>{ renderSchedule(); }, 60000);
+</script>
+</body>
+</html>
