@@ -76,6 +76,12 @@ input::placeholder { color: var(--text-muted); opacity: 0.5; }
 .schedule-header { display: grid; grid-template-columns: 60px 1fr; background: var(--surface-alt); border-bottom: 1px solid var(--border); }
 .schedule-header div { padding: 7px 8px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-align: center; border-right: 1px solid var(--border-light); letter-spacing: 0.03em; }
 .schedule-header div:last-child { border-right: none; }
+.past-toggle { display: flex; align-items: center; justify-content: center; padding: 6px; cursor: pointer; background: var(--surface-alt); border-bottom: 1px solid var(--border-light); font-size: 11px; color: var(--text-muted); font-weight: 600; gap: 4px; transition: background 0.15s; }
+.past-toggle:hover { background: var(--border-light); }
+.past-toggle .arrow { transition: transform 0.2s; display: inline-block; }
+.past-toggle .arrow.open { transform: rotate(180deg); }
+.past-rows { overflow: hidden; transition: max-height 0.3s ease; }
+.past-rows.collapsed { max-height: 0 !important; }
 .schedule-row { display: grid; grid-template-columns: 60px 1fr; border-bottom: 1px solid var(--border-light); transition: all 0.3s; }
 .schedule-row:last-child { border-bottom: none; }
 .schedule-row.past { background: var(--surface-alt); }
@@ -110,7 +116,7 @@ input::placeholder { color: var(--text-muted); opacity: 0.5; }
       <div class="track"><div class="fill" id="todo-fill" style="width:0%"></div></div>
     </div>
     <div class="progress-bar">
-      <div class="info"><span class="label">시간표</span><span class="count" id="sched-count">0/0</span></div>
+      <div class="info"><span class="label">하루</span><span class="count" id="sched-count"></span></div>
       <div class="track"><div class="fill" id="sched-fill" style="width:0%"></div></div>
     </div>
   </div>
@@ -229,14 +235,24 @@ function updateProgress() {
   document.getElementById('todo-count').style.color = todoPct===100&&todoTotal>0?'#16a34a':'';
 
   const nowHour = new Date().getHours();
-  const pastWithTask = schedule.filter(s=> parseInt(s.hour) < nowHour && s.task.trim()).length;
-  const totalWithTask = schedule.filter(s=>s.task.trim()).length;
-  const schedPct = HOURS.length ? Math.round((pastWithTask + schedule.filter(s=>parseInt(s.hour)>=nowHour && s.task.trim()).length) / HOURS.length * 100) : 0;
-  document.getElementById('sched-count').textContent = `${totalWithTask}/${HOURS.length}`;
+  const nowMin = new Date().getMinutes();
+  const startH = 5, endH = 23;
+  const totalMin = (endH - startH) * 60;
+  const elapsedMin = Math.max(0, Math.min(totalMin, (nowHour - startH) * 60 + nowMin));
+  const timePct = Math.round(elapsedMin / totalMin * 100);
+
+  const remainH = Math.max(0, endH - nowHour);
+  const remainM = remainH > 0 ? 60 - nowMin : 0;
+  const remainStr = remainH > 0 ? `${remainH}h ${remainM}m 남음` : '하루 종료';
+  document.getElementById('sched-count').textContent = remainStr;
+
   const schedFill = document.getElementById('sched-fill');
-  schedFill.style.width = schedPct+'%';
-  schedFill.className = 'fill' + (schedPct===100?' done':'');
-  document.getElementById('sched-count').style.color = schedPct===100?'#16a34a':'';
+  schedFill.style.width = timePct + '%';
+
+  const r = 37, g = 99, b2 = 235;
+  schedFill.style.background = 'linear-gradient(90deg, #2563eb 0%, #a855f7 40%, #ef4444 100%)';
+  schedFill.className = 'fill';
+  document.getElementById('sched-count').style.color = timePct >= 85 ? '#ef4444' : '';
 }
 
 function renderTodos() {
@@ -303,16 +319,49 @@ function closeDropdowns() {
   document.querySelectorAll('.overlay').forEach(o=>o.remove());
 }
 
+let pastOpen = false;
+
 function renderSchedule() {
   const nowHour = new Date().getHours();
   const container = document.getElementById('schedule-body');
   container.innerHTML = '';
-  schedule.forEach((item,i) => {
+
+  const pastItems = schedule.filter(s => parseInt(s.hour) < nowHour);
+  const currentAndFuture = schedule.filter(s => parseInt(s.hour) >= nowHour);
+
+  if (pastItems.length > 0) {
+    const toggle = document.createElement('div');
+    toggle.className = 'past-toggle';
+    toggle.innerHTML = `<span class="arrow ${pastOpen?'open':''}">▼</span> 지난 시간 (${pastItems.length})`;
+    toggle.addEventListener('click', () => {
+      pastOpen = !pastOpen;
+      renderSchedule();
+    });
+    container.appendChild(toggle);
+
+    const pastWrap = document.createElement('div');
+    pastWrap.className = 'past-rows' + (pastOpen ? '' : ' collapsed');
+    if (pastOpen) pastWrap.style.maxHeight = (pastItems.length * 40) + 'px';
+
+    pastItems.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'schedule-row past';
+      row.innerHTML = `
+        <div class="schedule-cell time-cell">${item.hour}</div>
+        <div class="schedule-cell" style="padding:0;border-right:none">
+          <input class="schedule-input" value="${item.task}" placeholder="—" data-hour="${item.hour}">
+        </div>
+      `;
+      pastWrap.appendChild(row);
+    });
+    container.appendChild(pastWrap);
+  }
+
+  currentAndFuture.forEach(item => {
     const hourNum = parseInt(item.hour);
-    const isPast = hourNum < nowHour;
     const isCurrent = hourNum === nowHour;
     const row = document.createElement('div');
-    row.className = 'schedule-row' + (isPast?' past':'');
+    row.className = 'schedule-row';
     const bg = isCurrent ? 'rgba(37,99,235,0.04)' : 'var(--surface)';
     row.innerHTML = `
       <div class="schedule-cell time-cell ${isCurrent?'now':''}" style="background:${bg}">
@@ -324,6 +373,7 @@ function renderSchedule() {
     `;
     container.appendChild(row);
   });
+
   container.querySelectorAll('.schedule-input').forEach(inp => {
     inp.addEventListener('input', ()=>{
       const s = schedule.find(x=>x.hour===inp.dataset.hour);
